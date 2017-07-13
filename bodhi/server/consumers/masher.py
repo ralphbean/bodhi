@@ -39,10 +39,13 @@ import fedmsg.consumers
 from bodhi.server import bugs, log, buildsys, notifications, mail, util
 from bodhi.server.config import config
 from bodhi.server.exceptions import BodhiException
-from bodhi.server.metadata import ExtendedMetadata
+from bodhi.server.metadata import ExtendedMetadata, PungiMetadata
 from bodhi.server.models import (Update, UpdateRequest, UpdateType, Release,
                                  UpdateStatus, ReleaseState, Base)
 from bodhi.server.util import sorted_updates, sanity_check_repodata, transactional_session_maker
+import pungi.notifier
+from pungi.compose import Compose
+from pungi_wrapper import PungiWrapper, VariantsConfig, PungiConfig
 
 
 def checkpoint(method):
@@ -197,9 +200,19 @@ Once mash is done:
                     if request == req:
                         self.log.info('Starting thread for %s %s for %d updates',
                                       release, request, len(updates))
-                        thread = MasherThread(release, request, updates, agent,
-                                              self.log, self.db_factory,
-                                              self.mash_dir, resume)
+                        if "modular" not in release:
+                            thread = MasherThread(
+                                release, request, updates, agent,
+                                self.log, self.db_factory,
+                                self.mash_dir, resume
+                            )
+                        else:
+                            thread = PungiMasherThread(
+                                release, request, updates, agent,
+                                self.log, self.db_factory,
+                                self.mash_dir, resume
+                            )
+
                         threads.append(thread)
                         thread.start()
                 for thread in threads:
@@ -310,7 +323,6 @@ class MasherThread(threading.Thread):
                 self.perform_gating()
 
             self.determine_and_perform_tag_actions()
-
             self.update_security_bugs()
 
             self.expire_buildroot_overrides()
@@ -643,8 +655,9 @@ class MasherThread(threading.Thread):
             self.log.info('Skipping completed repo: %s', self.path)
             return
 
-        comps = os.path.join(config.get('comps_dir'), 'comps-%s.xml' %
-                             self.release.branch)
+        comps = os.path.join(
+            config.get('comps_dir'), 'comps-%s.xml' % self.release.branch
+        )
         previous = os.path.join(config.get('mash_stage_dir'), self.id)
 
         mash_thread = MashThread(self.id, self.path, comps, previous, self.log)
@@ -696,8 +709,7 @@ class MasherThread(threading.Thread):
 
     def generate_updateinfo(self):
         self.log.info('Generating updateinfo for %s' % self.release.name)
-        uinfo = ExtendedMetadata(self.release, self.request,
-                                 self.db, self.path)
+        uinfo = ExtendedMetadata(self.release, self.request, self.db, self.path)
         self.log.info('Updateinfo generation for %s complete' % self.release.name)
         return uinfo
 
@@ -1042,3 +1054,232 @@ class MashThread(threading.Thread):
         else:
             self.success = True
         return out, err, returncode
+
+
+class PungiMasherThread(MasherThread):
+
+    def _get_compose_dir(self, mash_path, variant_id="Server"):
+        return os.path.join(mash_path, "compose", variant_id)
+
+    def _get_pungi_conf_path(self, config_name="fedora-modular-example.conf"):
+        if config.get("pungi_config_path"):
+            return os.path.join(config.get("pungi_config_path"), config_name)
+        else:
+            return os.path.join(
+                os.path.dirname(os.getcwd()), "bodhi", "devel", "pungi", config_name
+            )
+
+    def work(self):
+        # TODO need to check the type of the release beforehand if its modular
+        # or not
+        self.release = self.db.query(Release)\
+                              .filter_by(name=self.release).one()
+        self.id = getattr(self.release, '%s_tag' % self.request.value)
+
+        # Set our thread's "name" so it shows up nicely in the logs.
+        # https://docs.python.org/2/library/threading.html#thread-objects
+        self.name = self.id
+
+        # For 'pending' branched releases, we only want to perform repo-related
+        # tasks for testing updates. For stable updates, we should just add the
+        # dist_tag and do everything else other than mashing/updateinfo, since
+        # the nightly build-branched cron job mashes for us.
+        self.skip_mash = False
+        if (self.release.state is ReleaseState.pending and
+                self.request is UpdateRequest.stable):
+            self.skip_mash = True
+
+        self.log.info('Running MasherThread(%s)' % self.id)
+        self.init_state()
+        if not self.resume:
+            self.init_path()
+
+        notifications.publish(
+            topic="mashtask.mashing",
+            msg=dict(repo=self.id, updates=self.state['updates'], agent=self.agent),
+            force=True,
+        )
+
+        try:
+            if self.resume:
+                self.load_state()
+            else:
+                self.save_state()
+
+            self.load_updates()
+            self.verify_updates()
+
+            # NOTE: This checks tags on each build of a package. Is this needed
+            # for modules? As its producing bad tags and than escapes all
+            # module updates from payload for mashing.
+            # if "modular" not in self.id:
+            #    self.determine_and_perform_tag_actions()
+            self.update_security_bugs()
+
+            self.expire_buildroot_overrides()
+            self.remove_pending_tags()
+
+            if not self.skip_mash:
+                mash_thread = self.mash()
+
+            # Things we can do while we're mashing
+            self.complete_requests()
+            self.generate_testing_digest()
+
+            if not self.skip_mash:
+                uinfo = self.generate_updateinfo()
+
+                self.wait_for_mash(mash_thread)
+
+                uinfo.insert_updateinfo()
+                uinfo.cache_repodata()
+
+            # Compose OSTrees from our freshly mashed repos
+            if config.get('compose_atomic_trees'):
+                self.compose_atomic_trees()
+
+            if not self.skip_mash:
+                self.sanity_check_repo()
+                self.stage_repo()
+
+                # Wait for the repo to hit the master mirror
+                self.wait_for_sync()
+
+            # Send fedmsg notifications
+            self.send_notifications()
+
+            # Update bugzillas
+            self.modify_bugs()
+
+            # Add comments to updates
+            self.status_comments()
+
+            # Announce stable updates to the mailing list
+            self.send_stable_announcements()
+
+            # Email updates-testing digest
+            self.send_testing_digest()
+
+            self.success = True
+            self.remove_state()
+            self.unlock_updates()
+
+            self.check_all_karma_thresholds()
+            self.obsolete_older_updates()
+
+        except:
+            self.log.exception('Exception in MasherThread(%s)' % self.id)
+            self.save_state()
+            raise
+        finally:
+            self.finish(self.success)
+
+    def sanity_check_repo(self):
+        """Sanity check our repo.
+
+            - make sure we didn't compose a repo full of symlinks
+            - sanity check our repodata
+        """
+        mash_path = os.path.join(self.path, self.id)
+        self.log.info("Running sanity checks on %s" % mash_path)
+
+        compose_dir = self._get_compose_dir(mash_path)
+        dir_blacklist = ['source']
+        arches = [d for d in os.listdir(compose_dir) if d not in dir_blacklist]
+        for arch in arches:
+            try:
+                repodata = os.path.join(compose_dir, arch, "os", 'repodata')
+                sanity_check_repodata(repodata)
+            except Exception as e:
+                self.log.error("Repodata sanity check failed!\n%s" % str(e))
+                raise
+
+        # make sure that mash didn't symlink our packages
+        for pkg in os.listdir(os.path.join(compose_dir, arches[0], "os", "Packages", "a")):
+            if pkg.endswith('.rpm'):
+                if os.path.islink(os.path.join(compose_dir, arches[0], "os", "Packages", "a", pkg)):
+                    self.log.error("Mashed repository full of symlinks!")
+                    raise Exception
+                break
+
+        return True
+
+    def mash(self):
+        if self.path in self.state['completed_repos']:
+            self.log.info('Skipping completed repo: %s', self.path)
+            return
+
+        # TODO get from bodhi config
+        self.pungi_conf_path = self._get_pungi_conf_path()
+        self.pungi_conf = PungiConfig(path=self.pungi_conf_path, logger=self.log)
+        # TODO variants config needs to reflect the whole build not only updated modules
+        # also the variants id needs to be provided from somewhere.
+        self.variants_conf = VariantsConfig(self.updates, self.release.builds)
+        mash_thread = PungiMashThread(
+            self.id,
+            self.path,
+            self.pungi_conf,
+            self.variants_conf,
+            self.log
+        )
+        mash_thread.start()
+        return mash_thread
+
+    def generate_updateinfo(self):
+        self.log.info('Generating updateinfo for %s' % self.release.name)
+        mash_path = os.path.join(self.path, self.id)
+        compose_dir = self._get_compose_dir(mash_path)
+        uinfo = PungiMetadata(self.release, self.request, self.db, self.path, compose_dir)
+        self.log.info('Updateinfo generation for %s complete' % self.release.name)
+        return uinfo
+
+
+class PungiMashThread(threading.Thread):
+    """ A pungi masher thread. Is used for mashing modules with pungi. """
+
+    def __init__(self, compose_id, target_dir, pungi_conf, variants_conf, log):
+        super(PungiMashThread, self).__init__()
+        self.success = False
+        self.compose_id = compose_id
+        self.compose_type = "nightly"
+        self.pungi_conf = pungi_conf
+        self.variants_conf = variants_conf
+        self.log = log
+        self.compose_dir = PungiWrapper.init_compose_dir(
+            target_dir,
+            self.pungi_conf,
+            compose_id,
+            compose_type=self.compose_type,
+            compose_label=None
+        )
+        notifier = pungi.notifier.PungiNotifier(None)
+        self.compose = Compose(
+            self.pungi_conf,
+            topdir=self.compose_dir,
+            debug=True,
+            skip_phases=["productimg"],
+            just_phases=[],
+            old_composes=None,
+            koji_event=None,
+            supported=False,
+            logger=self.log,
+            notifier=notifier
+        )
+        self.name = compose_id
+
+    def run(self):
+        """Perform the mash in a subprocess."""
+        start = time.time()
+        self.log.info('Mashing %s', self.compose_id)
+        try:
+            pungi_wrapper = PungiWrapper(self.compose, self.variants_conf)
+            pungi_wrapper.compose_repo()
+        except Exception as ex:
+            self.log.error('There was a problem running mash (%s)' % ex.message)
+            raise Exception(ex.message)
+
+        self.log.info('Took %s seconds to mash %s', time.time() - start,
+                      self.compose_id)
+        self.success = True
+
+        return "Mash successfull"

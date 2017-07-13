@@ -26,3 +26,4 @@ RUN dnf install -y \
     python2-sqlalchemy_schemadisplay \
     python3-pydocstyle \
     python3-tox \
+    pungi\
