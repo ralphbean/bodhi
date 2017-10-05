@@ -1,6 +1,6 @@
 #!/usr/bin/bash -ex
 
-RELEASES="f25 f26 f27 rawhide"
+RELEASES="f25 f26 f27"
 
 gather_results() {
     # Move the test results from the container-specific folders into the top test_results folder.
