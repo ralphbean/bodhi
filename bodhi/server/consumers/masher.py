@@ -709,7 +709,8 @@ class MasherThread(threading.Thread):
 
     def generate_updateinfo(self):
         self.log.info('Generating updateinfo for %s' % self.release.name)
-        uinfo = ExtendedMetadata(self.release, self.request, self.db, self.path)
+        uinfo = ExtendedMetadata(self.release, self.request,
+                                 self.db, self.path)
         self.log.info('Updateinfo generation for %s complete' % self.release.name)
         return uinfo
 
@@ -1070,8 +1071,6 @@ class PungiMasherThread(MasherThread):
             )
 
     def work(self):
-        # TODO need to check the type of the release beforehand if its modular
-        # or not
         self.release = self.db.query(Release)\
                               .filter_by(name=self.release).one()
         self.id = getattr(self.release, '%s_tag' % self.request.value)
@@ -1195,12 +1194,12 @@ class PungiMasherThread(MasherThread):
                 raise
 
         # make sure that mash didn't symlink our packages
-        for pkg in os.listdir(os.path.join(compose_dir, arches[0], "os", "Packages", "a")):
+        rpm_dir = os.listdir(os.path.join(compose_dir, arches[0], "os", "Packages"))[0]
+        for pkg in os.listdir(rpm_dir):
             if pkg.endswith('.rpm'):
                 if os.path.islink(os.path.join(compose_dir, arches[0], "os", "Packages", "a", pkg)):
                     self.log.error("Mashed repository full of symlinks!")
                     raise Exception
-                break
 
         return True
 

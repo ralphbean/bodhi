@@ -1864,3 +1864,67 @@ class TestPungiMasherThread(object):
 
         pungi_metadata.assert_called_once()
         get_compose_dir.assert_called_once()
+
+    @mock.patch('bodhi.server.notifications.publish')
+    def test_skip_mash(self, *args):
+        masher_mock = mock.create_autospec(self.wrapper)
+        masher_mock.work = lambda: PungiMasherThread.work(masher_mock)
+        masher_mock.request = UpdateRequest.from_string('stable')
+        release = mock.Mock()
+        release.state = ReleaseState.pending
+        masher_mock.db = mock.Mock()
+        masher_mock.db.query.return_value.filter_by.return_value.one.return_value = release
+        masher_mock.log = mock.Mock()
+        masher_mock.work()
+
+        assert masher_mock.skip_mash is True
+
+    @mock.patch('bodhi.server.notifications.publish')
+    def test_work_exception(self, *args):
+        masher_mock = mock.create_autospec(self.wrapper)
+        masher_mock.work = lambda: PungiMasherThread.work(masher_mock)
+        masher_mock.request = UpdateRequest.from_string('stable')
+        release = mock.Mock()
+        release.state = ReleaseState.current
+        masher_mock.db = mock.Mock()
+        masher_mock.db.query.return_value.filter_by.return_value.one.return_value = release
+        masher_mock.log = mock.Mock()
+        masher_mock.load_updates.side_effect = Exception("Just fail!")
+
+        with pytest.raises(Exception):
+            masher_mock.work()
+
+        masher_mock.log.exception.assert_called_once()
+        masher_mock.save_state.assert_called_once()
+
+    @mock.patch('bodhi.server.notifications.publish')
+    @mock.patch('bodhi.server.consumers.masher.config')
+    def test_work_compose_atomic_trees(self, config, *args):
+        masher_mock = mock.create_autospec(self.wrapper)
+        masher_mock.work = lambda: PungiMasherThread.work(masher_mock)
+        masher_mock.request = UpdateRequest.from_string('stable')
+        release = mock.Mock()
+        release.state = ReleaseState.current
+        masher_mock.db = mock.Mock()
+        masher_mock.db.query.return_value.filter_by.return_value.one.return_value = release
+        masher_mock.log = mock.Mock()
+        config.get.return_value = True
+        masher_mock.work()
+
+        masher_mock.compose_atomic_trees.assert_called_once()
+
+    def test_skipping_completed_repo(self, *args):
+        masher_mock = mock.create_autospec(self.wrapper)
+        masher_mock.mash = lambda: PungiMasherThread.mash(masher_mock)
+        masher_mock.request = UpdateRequest.from_string('stable')
+        release = mock.Mock()
+        release.state = ReleaseState.current
+        masher_mock.db = mock.Mock()
+        masher_mock.db.query.return_value.filter_by.return_value.one.return_value = release
+        masher_mock.log = mock.Mock()
+        masher_mock.state = {"completed_repos": ["/tmp/mashed_repo"]}
+        masher_mock.path = "/tmp/mashed_repo"
+
+        masher_mock.mash()
+
+        masher_mock.log.info.assert_called_once()
