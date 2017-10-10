@@ -1063,6 +1063,13 @@ class PungiMasherThread(MasherThread):
         return os.path.join(mash_path, "compose", variant_id)
 
     def _get_pungi_conf_path(self, config_name="fedora-modular-example.conf"):
+        """ Return the pungi configuration path.
+
+        Args:
+            config_name (str): The name of the pungi configuration file.
+        Returns:
+            str: The assumed path on disk to the given configuration file.
+        """
         if config.get("pungi_config_path"):
             return os.path.join(config.get("pungi_config_path"), config_name)
         else:
