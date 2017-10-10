@@ -1080,14 +1080,6 @@ class PungiMasherThread(MasherThread):
     def _get_compose_dir(self, mash_path, variant_id="Server"):
         return os.path.join(mash_path, "compose", variant_id)
 
-    def _get_pungi_conf_path(self, config_name="fedora-modular-example.conf"):
-        if config.get("pungi_config_path"):
-            return os.path.join(config.get("pungi_config_path"), config_name)
-        else:
-            return os.path.join(
-                os.path.dirname(os.getcwd()), "bodhi", "devel", "pungi", config_name
-            )
-
     def sanity_check_repo(self):
         """Sanity check our repo.
 
@@ -1123,8 +1115,7 @@ class PungiMasherThread(MasherThread):
             self.log.info('Skipping completed repo: %s', self.path)
             return
 
-        # TODO get from bodhi config
-        self.pungi_conf_path = self._get_pungi_conf_path()
+        self.pungi_conf_path = config.get("pungi_config_path")
         self.pungi_conf = PungiConfig(path=self.pungi_conf_path, logger=self.log)
         # TODO variants config needs to reflect the whole build not only updated modules
         # also the variants id needs to be provided from somewhere.
