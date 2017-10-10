@@ -1275,7 +1275,7 @@ class PungiMashThread(threading.Thread):
             pungi_wrapper.compose_repo()
         except Exception as ex:
             self.log.error('There was a problem running mash (%s)' % ex.message)
-            raise Exception(ex.message)
+            raise
 
         self.log.info('Took %s seconds to mash %s', time.time() - start,
                       self.compose_id)
