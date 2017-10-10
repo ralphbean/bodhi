@@ -36,6 +36,8 @@ from productmd.composeinfo import ComposeInfo
 from pungi.wrappers.variants import VariantsXmlParser
 from pungi.util import makedirs
 
+from bodhi.config import _validate_bool as asbool
+
 
 class PungiWrapper(fedmsg.consumers.FedmsgConsumer):
 
@@ -57,9 +59,9 @@ class PungiWrapper(fedmsg.consumers.FedmsgConsumer):
         ci.release.name = conf["release_name"]
         ci.release.short = conf["release_short"]
         ci.release.version = conf["release_version"]
-        ci.release.is_layered = bool(conf.get("release_is_layered", False))
+        ci.release.is_layered = asbool(conf.get("release_is_layered", False))
         ci.release.type = conf.get("release_type", "ga").lower()
-        ci.release.internal = bool(conf.get("release_internal", False))
+        ci.release.internal = asbool(conf.get("release_internal", False))
         if ci.release.is_layered:
             ci.base_product.name = conf["base_product_name"]
             ci.base_product.short = conf["base_product_short"]
