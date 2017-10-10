@@ -1060,6 +1060,14 @@ class MashThread(threading.Thread):
 class PungiMasherThread(MasherThread):
 
     def _get_compose_dir(self, mash_path, variant_id="Server"):
+        """ Return the compose directory
+
+        Args:
+            mash_path (str): A path on disk.
+            variant_id (str): The variant to compose.
+        Returns:
+            str: The directory in the mash path for the compose.
+        """
         return os.path.join(mash_path, "compose", variant_id)
 
     def _get_pungi_conf_path(self, config_name="fedora-modular-example.conf"):
