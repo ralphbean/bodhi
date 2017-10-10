@@ -13,15 +13,14 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import mock
-import pytest
 import os
 
+from pungi.compose import Compose
+import pytest
 
 from bodhi.server.consumers.pungi_wrapper import (
     PungiWrapper, PungiConfig, VariantsConfig
 )
-
-from pungi.compose import Compose
 
 
 @pytest.mark.usefixture("get_pungi_conf")
