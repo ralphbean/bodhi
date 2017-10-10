@@ -231,30 +231,27 @@ class PungiWrapper(fedmsg.consumers.FedmsgConsumer):
                 pungi.metadata.write_media_repo(self.compose, arch, variant, timestamp)
 
     def create_latest_repo_links(self):
-        latest_link = True
-
-        if latest_link:
-            self.compose_dir = os.path.basename(self.compose.topdir)
-            symlink_name = "latest-%s-%s" % (
-                self.compose.conf["release_short"],
-                self.compose.conf["release_version"]
+        self.compose_dir = os.path.basename(self.compose.topdir)
+        symlink_name = "latest-%s-%s" % (
+            self.compose.conf["release_short"],
+            self.compose.conf["release_version"]
+        )
+        if self.compose.conf["release_is_layered"]:
+            symlink_name += "-%s-%s" % (
+                self.compose.conf["base_product_short"],
+                self.compose.conf["base_product_version"]
             )
-            if self.compose.conf["release_is_layered"]:
-                symlink_name += "-%s-%s" % (
-                    self.compose.conf["base_product_short"],
-                    self.compose.conf["base_product_version"]
-                )
-            symlink = os.path.join(self.compose.topdir, "..", symlink_name)
+        symlink = os.path.join(self.compose.topdir, "..", symlink_name)
 
-            try:
-                os.unlink(symlink)
-            except OSError as ex:
-                if ex.errno != errno.ENOENT:
-                    raise Exception(ex)
-            try:
-                os.symlink(self.compose_dir, symlink)
-            except Exception as ex:
-                self.compose.log_error("Couldn't create latest symlink: %s" % ex)
+        try:
+            os.unlink(symlink)
+        except OSError as ex:
+            if ex.errno != errno.ENOENT:
+                raise Exception(ex)
+        try:
+            os.symlink(self.compose_dir, symlink)
+        except Exception as ex:
+            self.compose.log_error("Couldn't create latest symlink: %s" % ex)
 
 
 class VariantsConfig(object):
