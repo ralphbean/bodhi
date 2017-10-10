@@ -1766,10 +1766,9 @@ class TestPungiMashThread(object):
         mash = PungiMashThread(compose_id, target_dir, pungi_conf, variants_conf, logger)
 
         assert not mash.success
-        result = mash.run()
+        mash.run()
         pungi_wrapper().compose_repo.assert_called_once()
         assert mash.success
-        assert result == "Mash successfull"
 
     @mock.patch("bodhi.server.consumers.masher.Compose")
     @mock.patch("pungi.notifier.PungiNotifier")

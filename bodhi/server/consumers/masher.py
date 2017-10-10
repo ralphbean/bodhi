@@ -1054,7 +1054,6 @@ class MashThread(threading.Thread):
             raise Exception('mash failed')
         else:
             self.success = True
-        return out, err, returncode
 
 
 class PungiMasherThread(MasherThread):
@@ -1280,5 +1279,3 @@ class PungiMashThread(threading.Thread):
         self.log.info('Took %s seconds to mash %s', time.time() - start,
                       self.compose_id)
         self.success = True
-
-        return "Mash successfull"
