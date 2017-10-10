@@ -25,9 +25,9 @@ import os
 import shutil
 import tempfile
 import mock
-import pytest
 
 import createrepo_c
+import pytest
 
 from bodhi.server.buildsys import (setup_buildsystem, teardown_buildsystem,
                                    DevBuildsys)
