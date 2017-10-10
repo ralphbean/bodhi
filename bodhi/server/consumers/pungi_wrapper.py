@@ -23,16 +23,14 @@ import os
 import time
 import cStringIO
 import shutil
+
 import fedmsg.consumers
-
-
 import pungi.checks
 import pungi.phases
 import pungi.metadata
 import pungi.notifier
 import kobo.conf
 from productmd.composeinfo import ComposeInfo
-
 from pungi.wrappers.variants import VariantsXmlParser
 from pungi.util import makedirs
 
