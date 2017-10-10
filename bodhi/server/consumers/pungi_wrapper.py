@@ -73,12 +73,7 @@ class PungiWrapper(fedmsg.consumers.FedmsgConsumer):
 
         ci.compose.id = ci.create_compose_id()
 
-        # NOTE: For modularity purpose we provide the compose_id. Which comes
-        # from bodhi
-        # if compose_id:
         compose_dir = os.path.join(topdir, compose_id)
-        # else:
-        #    compose_dir = os.path.join(topdir, ci.compose.id)
 
         os.makedirs(compose_dir)
 
