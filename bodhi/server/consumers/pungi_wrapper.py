@@ -68,7 +68,7 @@ class PungiWrapper(fedmsg.consumers.FedmsgConsumer):
 
         ci.compose.label = compose_label
         ci.compose.type = compose_type
-        ci.compose.date = compose_date or time.strftime("%Y%m%d", time.localtime())
+        ci.compose.date = compose_date or time.strftime("%Y%m%d", time.gmtime())
         ci.compose.respin = compose_respin or 0
 
         ci.compose.id = ci.create_compose_id()
