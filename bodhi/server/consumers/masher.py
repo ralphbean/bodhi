@@ -1204,6 +1204,8 @@ class PungiMasherThread(MasherThread):
         return True
 
     def mash(self):
+        """ Kick off the PungiMashThread and return a reference. """
+
         if self.path in self.state['completed_repos']:
             self.log.info('Skipping completed repo: %s', self.path)
             return
