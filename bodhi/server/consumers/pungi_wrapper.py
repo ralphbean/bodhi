@@ -12,7 +12,7 @@
 # this program; if not, write to the Free Software Foundation, Inc., 51
 # Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 """
-The Bodhi "Masher".
+The Pungi "Masher".
 
 This module is responsible for the process of "pushing" updates out. It's
 comprised of a fedmsg consumer that launches threads for each repository being
