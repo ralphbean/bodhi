@@ -440,6 +440,12 @@ class MasherThread(threading.Thread):
                 continue
 
     def perform_gating(self):
+
+        if 'modular' in self.id:
+            # We can/should enable gating for modules after we work out kinks.
+            self.log.warn("SKIPPING gating check for %r" % self.id)
+            return
+
         self.log.debug('Performing gating.')
         for update in list(self.updates):
             result, reason = update.check_requirements(self.db, config)
@@ -640,6 +646,12 @@ class MasherThread(threading.Thread):
         Update our comps git module and merge the latest translations so we can
         pass it to mash insert into the repodata.
         """
+
+        if 'modular' in self.id:
+            # Comps for the modular repo doesn't make any sense.
+            self.log.warn("SKIPPING comps update for %r" % self.id)
+            return
+
         self.log.info("Updating comps")
         comps_dir = config.get('comps_dir')
         comps_url = config.get('comps_url')
@@ -922,6 +934,12 @@ class MasherThread(threading.Thread):
     @checkpoint
     def compose_atomic_trees(self):
         """Compose Atomic OSTrees for each tag that we mashed."""
+
+        if 'modular' in self.id:
+            # We can start building atomic trees for modules later.  One thing at a time.
+            self.log.warn("SKIPPING compose of atomic trees for %r" % self.id)
+            return
+
         composer = AtomicComposer()
         mashed_repos = dict([('-'.join(os.path.basename(repo).split('-')[:-1]), repo)
                              for repo in self.state['completed_repos']])
@@ -1069,109 +1087,6 @@ class PungiMasherThread(MasherThread):
             return os.path.join(
                 os.path.dirname(os.getcwd()), "bodhi", "devel", "pungi", config_name
             )
-
-    def work(self):
-        self.release = self.db.query(Release)\
-                              .filter_by(name=self.release).one()
-        self.id = getattr(self.release, '%s_tag' % self.request.value)
-
-        # Set our thread's "name" so it shows up nicely in the logs.
-        # https://docs.python.org/2/library/threading.html#thread-objects
-        self.name = self.id
-
-        # For 'pending' branched releases, we only want to perform repo-related
-        # tasks for testing updates. For stable updates, we should just add the
-        # dist_tag and do everything else other than mashing/updateinfo, since
-        # the nightly build-branched cron job mashes for us.
-        self.skip_mash = False
-        if (self.release.state is ReleaseState.pending and
-                self.request is UpdateRequest.stable):
-            self.skip_mash = True
-
-        self.log.info('Running MasherThread(%s)' % self.id)
-        self.init_state()
-        if not self.resume:
-            self.init_path()
-
-        notifications.publish(
-            topic="mashtask.mashing",
-            msg=dict(repo=self.id, updates=self.state['updates'], agent=self.agent),
-            force=True,
-        )
-
-        try:
-            if self.resume:
-                self.load_state()
-            else:
-                self.save_state()
-
-            self.load_updates()
-            self.verify_updates()
-
-            # NOTE: This checks tags on each build of a package. Is this needed
-            # for modules? As its producing bad tags and than escapes all
-            # module updates from payload for mashing.
-            # if "modular" not in self.id:
-            #    self.determine_and_perform_tag_actions()
-            self.update_security_bugs()
-
-            self.expire_buildroot_overrides()
-            self.remove_pending_tags()
-
-            if not self.skip_mash:
-                mash_thread = self.mash()
-
-            # Things we can do while we're mashing
-            self.complete_requests()
-            self.generate_testing_digest()
-
-            if not self.skip_mash:
-                uinfo = self.generate_updateinfo()
-
-                self.wait_for_mash(mash_thread)
-
-                uinfo.insert_updateinfo()
-                uinfo.cache_repodata()
-
-            # Compose OSTrees from our freshly mashed repos
-            if config.get('compose_atomic_trees'):
-                self.compose_atomic_trees()
-
-            if not self.skip_mash:
-                self.sanity_check_repo()
-                self.stage_repo()
-
-                # Wait for the repo to hit the master mirror
-                self.wait_for_sync()
-
-            # Send fedmsg notifications
-            self.send_notifications()
-
-            # Update bugzillas
-            self.modify_bugs()
-
-            # Add comments to updates
-            self.status_comments()
-
-            # Announce stable updates to the mailing list
-            self.send_stable_announcements()
-
-            # Email updates-testing digest
-            self.send_testing_digest()
-
-            self.success = True
-            self.remove_state()
-            self.unlock_updates()
-
-            self.check_all_karma_thresholds()
-            self.obsolete_older_updates()
-
-        except:
-            self.log.exception('Exception in MasherThread(%s)' % self.id)
-            self.save_state()
-            raise
-        finally:
-            self.finish(self.success)
 
     def sanity_check_repo(self):
         """Sanity check our repo.

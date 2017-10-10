@@ -1483,6 +1483,7 @@ class TestMasherThread_update_comps(unittest.TestCase):
     def setUp(self):
         self.masher_thread = MasherThread(u'F17', u'stable', [u'bodhi-2.0-1.fc17'],
                                           u'bowlofeggs', mock.Mock(), mock.Mock(), mock.Mock())
+        self.masher_thread.id = "whatever"  # not-modular
 
     @mock.patch('bodhi.server.consumers.masher.os.path.exists')
     @mock.patch('bodhi.server.consumers.masher.config', {'comps_dir': '/some/path',
