@@ -668,7 +668,7 @@ class MasherThread(threading.Thread):
             self.log.info('Skipping completed repo: %s', self.path)
             return
 
-        comps = os.path.join(config.get('comps_dir'), 'comps-%s.xml' % 
+        comps = os.path.join(config.get('comps_dir'), 'comps-%s.xml' %
                              self.release.branch)
         previous = os.path.join(config.get('mash_stage_dir'), self.id)
 
@@ -1131,12 +1131,12 @@ class PungiMasherThread(MasherThread):
         return mash_thread
 
     def generate_updateinfo(self):
-        """                                                                          
+        """
         Generates and object which represents data for updateinfo.xml file.
-        
+
         Returns:
             PungiMetadata object: represents pungi metadata object
-        """                    
+        """
         self.log.info('Generating updateinfo for %s' % self.release.name)
         mash_path = os.path.join(self.path, self.id)
         compose_dir = self._get_compose_dir(mash_path)
