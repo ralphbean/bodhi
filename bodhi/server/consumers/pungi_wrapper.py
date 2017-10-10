@@ -19,6 +19,7 @@ comprised of a fedmsg consumer that launches threads for each repository being
 mashed.
 """
 
+import errno
 import os
 import time
 import cStringIO
@@ -248,7 +249,7 @@ class PungiWrapper(fedmsg.consumers.FedmsgConsumer):
             try:
                 os.unlink(symlink)
             except OSError as ex:
-                if ex.errno != 2:
+                if ex.errno != errno.ENOENT:
                     raise Exception(ex)
             try:
                 os.symlink(self.compose_dir, symlink)
