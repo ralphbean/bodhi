@@ -24,7 +24,6 @@ import time
 import cStringIO
 import shutil
 
-import fedmsg.consumers
 import pungi.checks
 import pungi.phases
 import pungi.metadata
@@ -35,8 +34,7 @@ from pungi.wrappers.variants import VariantsXmlParser
 from pungi.util import makedirs
 
 
-class PungiWrapper(fedmsg.consumers.FedmsgConsumer):
-
+class PungiWrapper(object):
     """Pungi Wrapper which wraps the pungi package functionality."""
 
     def __init__(self, compose, variants_conf):
