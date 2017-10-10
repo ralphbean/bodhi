@@ -82,7 +82,8 @@ class PungiWrapper(fedmsg.consumers.FedmsgConsumer):
 
         os.makedirs(compose_dir)
 
-        open(os.path.join(compose_dir, "COMPOSE_ID"), "w").write(ci.compose.id)
+        with open(os.path.join(compose_dir, "COMPOSE_ID"), "w") as fd:
+            fd.write(ci.compose.id)
         work_dir = os.path.join(compose_dir, "work", "global")
         makedirs(work_dir)
         ci.dump(os.path.join(work_dir, "composeinfo-base.json"))
