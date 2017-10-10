@@ -12,11 +12,11 @@
 # this program; if not, write to the Free Software Foundation, Inc., 51
 # Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 """
-The Pungi "Masher".
+Our Very Own Pungi Wrapper.
 
-This module is responsible for the process of "pushing" updates out. It's
-comprised of a fedmsg consumer that launches threads for each repository being
-mashed.
+This module comprises tools that wrap pungi providing a kind of "API" we use
+internally.  Once pungi gets its own proper API, this module will either need
+to be refactored or abandoned.
 """
 
 import os
