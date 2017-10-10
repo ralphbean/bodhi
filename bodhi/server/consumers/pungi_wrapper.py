@@ -132,7 +132,7 @@ class PungiWrapper(fedmsg.consumers.FedmsgConsumer):
         if errors:
             for i in errors:
                 self.compose.log_error(i)
-            raise Exception(errors)
+            raise RuntimeError(errors)
 
         # INIT phase
         init_phase.start()
