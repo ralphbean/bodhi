@@ -1176,7 +1176,6 @@ class PungiMasherThread(MasherThread):
     def sanity_check_repo(self):
         """Sanity check our repo.
 
-            - make sure we didn't compose a repo full of symlinks
             - sanity check our repodata
         """
         mash_path = os.path.join(self.path, self.id)
@@ -1192,14 +1191,6 @@ class PungiMasherThread(MasherThread):
             except Exception as e:
                 self.log.error("Repodata sanity check failed!\n%s" % str(e))
                 raise
-
-        # make sure that mash didn't symlink our packages
-        rpm_dir = os.listdir(os.path.join(compose_dir, arches[0], "os", "Packages"))[0]
-        for pkg in os.listdir(rpm_dir):
-            if pkg.endswith('.rpm'):
-                if os.path.islink(os.path.join(compose_dir, arches[0], "os", "Packages", "a", pkg)):
-                    self.log.error("Mashed repository full of symlinks!")
-                    raise Exception
 
         return True
 
