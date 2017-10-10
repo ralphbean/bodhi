@@ -1058,6 +1058,7 @@ class MashThread(threading.Thread):
 
 
 class PungiMasherThread(MasherThread):
+    """ Like the MasherThread, but with pungi, for modules. """
 
     def _get_compose_dir(self, mash_path, variant_id="Server"):
         return os.path.join(mash_path, "compose", variant_id)
