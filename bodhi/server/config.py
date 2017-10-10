@@ -479,7 +479,7 @@ class BodhiConfig(dict):
         'pkgdb_url': {
             'value': 'https://admin.fedoraproject.org/pkgdb',
             'validator': unicode},
-        'pungi_config_path': {
+        'pungi_modular_config_path': {
             'value': '/etc/bodhi/pungi/fedora-modular.conf',
             'validator': unicode},
         'query_wiki_test_cases': {

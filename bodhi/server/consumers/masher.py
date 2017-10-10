@@ -1115,7 +1115,7 @@ class PungiMasherThread(MasherThread):
             self.log.info('Skipping completed repo: %s', self.path)
             return
 
-        self.pungi_conf_path = config.get("pungi_config_path")
+        self.pungi_conf_path = config.get("pungi_modular_config_path")
         self.pungi_conf = PungiConfig(path=self.pungi_conf_path, logger=self.log)
         # TODO variants config needs to reflect the whole build not only updated modules
         # also the variants id needs to be provided from somewhere.
